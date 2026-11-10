@@ -59,8 +59,9 @@ Method:
    justify reachability and reproduction. Prefer fewer, solid findings over many
    speculative ones.
 
-When the goal is covered, stop calling tools and give a short summary of what you
-tested and what you concluded.
+Start immediately by calling probe_parameter on the seed request — do not reply
+with a plan first. Act through tools; only stop calling tools once you are
+genuinely done, then give a short summary of what you tested and concluded.
 """
 
 
@@ -92,7 +93,12 @@ class Agent:
         schemas = self.tools.schemas()
 
         for step in range(self.max_steps):
-            resp = self.llm.call(SYSTEM, history, schemas)
+            # Force a tool call on the first step so the agent actually starts
+            # probing instead of replying with a plan and stopping.
+            tool_choice = {"type": "any"} if step == 0 else None
+            resp = self.llm.call(SYSTEM, history, schemas, tool_choice=tool_choice)
+            self._log(f"[step {step+1}] stop={resp.stop_reason} "
+                      f"blocks={resp.block_types} calls={len(resp.tool_calls)}")
             if resp.text:
                 self._log(f"[step {step+1}] model: {resp.text[:300]}")
             history.append({

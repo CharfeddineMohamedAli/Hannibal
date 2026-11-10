@@ -25,6 +25,8 @@ class ToolCall:
 class LLMResponse:
     text: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
+    stop_reason: str = ""
+    block_types: list[str] = field(default_factory=list)
 
     @property
     def done(self) -> bool:
@@ -34,7 +36,8 @@ class LLMResponse:
 
 class LLMClient(ABC):
     @abstractmethod
-    def call(self, system: str, history: list[dict], tools: list[dict]) -> LLMResponse:
+    def call(self, system: str, history: list[dict], tools: list[dict],
+             tool_choice: dict | None = None) -> LLMResponse:
         ...
 
 
@@ -73,21 +76,28 @@ class AnthropicClient(LLMClient):
                 ]})
         return messages
 
-    def call(self, system: str, history: list[dict], tools: list[dict]) -> LLMResponse:
-        resp = self._client.messages.create(
+    def call(self, system: str, history: list[dict], tools: list[dict],
+             tool_choice: dict | None = None) -> LLMResponse:
+        kwargs = dict(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system,
             tools=tools,
             messages=self._to_messages(history),
         )
-        text, calls = "", []
+        if tool_choice is not None:
+            kwargs["tool_choice"] = tool_choice
+        resp = self._client.messages.create(**kwargs)
+        text, calls, types = "", [], []
         for block in resp.content:
+            types.append(getattr(block, "type", "?"))
             if block.type == "text":
                 text += block.text
             elif block.type == "tool_use":
                 calls.append(ToolCall(id=block.id, name=block.name, args=dict(block.input)))
-        return LLMResponse(text=text, tool_calls=calls)
+        return LLMResponse(text=text, tool_calls=calls,
+                           stop_reason=getattr(resp, "stop_reason", "") or "",
+                           block_types=types)
 
 
 class FakeLLMClient(LLMClient):
@@ -97,7 +107,8 @@ class FakeLLMClient(LLMClient):
         self._script = list(script)
         self.calls_seen = 0
 
-    def call(self, system: str, history: list[dict], tools: list[dict]) -> LLMResponse:
+    def call(self, system: str, history: list[dict], tools: list[dict],
+             tool_choice: dict | None = None) -> LLMResponse:
         self.calls_seen += 1
         if not self._script:
             return LLMResponse(text="(script exhausted)")
