@@ -22,7 +22,9 @@ from .mutate import Mutation
 _SQL_ERRORS = re.compile(
     r"(SQL syntax|SQLSTATE|ORA-\d{5}|psql:|PG::|"
     r"unclosed quotation mark|quoted string not properly terminated|"
-    r"SQLiteException|you have an error in your sql|mysql_fetch|"
+    r"SQLiteException|SQLITE_ERROR|sqlite3\.|near \"[^\"]*\": syntax error|"
+    r"SequelizeDatabaseError|Sequelize[A-Za-z]*Error|"
+    r"you have an error in your sql|mysql_fetch|"
     r"org\.hibernate|System\.Data\.SqlClient)",
     re.IGNORECASE,
 )
