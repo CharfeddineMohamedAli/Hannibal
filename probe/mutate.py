@@ -61,14 +61,31 @@ def _apply_json(body: bytes, key: str, value: str) -> bytes:
     return json.dumps(data).encode("utf-8")
 
 
-def mutate(req: Request, classes: list[str] | None = None) -> list[Mutation]:
-    """Every (injection point x payload) as a ready-to-send Mutation."""
+def mutate(
+    req: Request,
+    classes: list[str] | None = None,
+    payloads: list[Payload] | None = None,
+) -> list[Mutation]:
+    """Every (injection point x payload) as a ready-to-send Mutation.
+
+    By default uses the built-in catalogue. Pass `payloads` (e.g. from
+    load_payload_file) to use your own set instead; if `classes` is also given,
+    the set is filtered to those classes.
+    """
     points = discover_points(req)
     out: list[Mutation] = []
 
+    if payloads is None:
+        source = payloads_for(classes)
+    elif classes:
+        keep = set(classes)
+        source = [p for p in payloads if p.payload_class in keep]
+    else:
+        source = list(payloads)
+
     for point in points:
         kind, _, key = point.partition(":")
-        for payload in payloads_for(classes):
+        for payload in source:
             marker = _new_marker()
             # replace() not format(): payloads are written literally, so braces
             # in e.g. {{7*7}} need no escaping and {m} is the only token.

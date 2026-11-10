@@ -61,3 +61,27 @@ def payloads_for(classes: list[str] | None = None) -> list[Payload]:
         return list(PAYLOADS)
     keep = set(classes)
     return [p for p in PAYLOADS if p.payload_class in keep or p is CONTROL]
+
+
+def load_payload_file(
+    path: str, payload_class: str, expected_delay_ms: int = 0
+) -> list[Payload]:
+    """Load payloads from a plain-text file — one per line, '#' comments and
+    blank lines skipped — and tag them all with payload_class.
+
+    This is the hook for public payload corpora (SecLists, PayloadsAllTheThings):
+    you download the lists you want and point the loader at them, so the tool
+    ships no exploitation arsenal of its own. A line may contain '{m}' to mark
+    where the per-request canary marker goes; lines without it are sent verbatim
+    (marker-based reflection detection won't apply to those, but the differential,
+    error, and timing detectors still do).
+    """
+    out: list[Payload] = []
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            line = raw.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            out.append(Payload(template=line, payload_class=payload_class,
+                               expected_delay_ms=expected_delay_ms))
+    return out

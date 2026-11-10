@@ -63,6 +63,23 @@ with RequestEngine(config) as engine:
 Swap `AnthropicClient()` for any `LLMClient`; `FakeLLMClient` drives the loop in
 tests with no API key (see `tests/test_agent.py`).
 
+## Payloads: bring your own
+
+The repo ships only a tiny set of detection probes. For real testing, point the
+loader at public payload corpora — the tool stays a loader, not an arsenal:
+
+```python
+from probe.payloads import load_payload_file
+from probe.mutate import mutate
+
+# download e.g. SecLists / PayloadsAllTheThings, then:
+xss = load_payload_file("SecLists/Fuzzing/XSS/XSS-Jhaddix.txt", "reflection")
+muts = mutate(request, payloads=xss)
+```
+
+Lines with `{m}` get the per-request canary marker; others are sent verbatim.
+See `examples/payloads.example.txt` for the format and source links.
+
 ## Usage
 
 ```python

@@ -1,0 +1,17 @@
+# Example payload file for load_payload_file(path, payload_class).
+#
+# One payload per line. Lines starting with '#' and blank lines are ignored.
+# Put '{m}' where you want the per-request canary marker inserted (lets the
+# oracle spot YOUR input reflected back); lines without it are sent verbatim.
+#
+# This file is intentionally tiny. For real testing, download a payload corpus
+# from a public source and point the loader at the file you want, e.g.:
+#   - SecLists:            github.com/danielmiessler/SecLists  (Fuzzing/, etc.)
+#   - PayloadsAllTheThings: github.com/swisskyrepo/PayloadsAllTheThings
+# Load each category file with its matching class, e.g.
+#   load_payload_file("xss.txt", "reflection")
+#
+# A few harmless reflection probes to show the format:
+{m}<x>
+{m}'"<>
+{m}{{7*7}}

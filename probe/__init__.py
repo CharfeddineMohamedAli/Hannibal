@@ -7,7 +7,7 @@ from .engine import RequestEngine
 from .models import Request, Response
 from .mutate import Mutation, discover_points, mutate
 from .oracle import Signal, analyze
-from .payloads import Payload, payloads_for
+from .payloads import Payload, load_payload_file, payloads_for
 from .agent import Agent
 from .llm import AnthropicClient, FakeLLMClient, LLMClient, LLMResponse, ToolCall
 from .scope import ScopeError, ScopeGuard
@@ -27,6 +27,7 @@ __all__ = [
     "Signal",
     "Payload",
     "payloads_for",
+    "load_payload_file",
     "Agent",
     "Tools",
     "Finding",
