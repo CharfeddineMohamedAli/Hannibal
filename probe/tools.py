@@ -56,8 +56,10 @@ def _request_from(args: dict) -> Request:
 
 
 class Tools:
-    def __init__(self, engine: RequestEngine):
+    def __init__(self, engine: RequestEngine, oast=None, payloads=None):
         self.engine = engine
+        self.oast = oast            # optional OASTProvider for blind detection
+        self.payloads = payloads    # optional loaded payload set (else built-ins)
         self.findings: list[Finding] = []
 
     # ---- schemas advertised to the model -------------------------------
@@ -93,6 +95,16 @@ class Tools:
                 },
             },
             {
+                "name": "check_oast",
+                "description": "Poll your out-of-band listener for callbacks. A hit "
+                               "whose token matches one you planted (see planted_oast "
+                               "in a probe result) confirms a blind bug — the target "
+                               "reached your listener even though the response showed "
+                               "nothing. Call this a little after sending an {oast} "
+                               "probe, since callbacks arrive out of band.",
+                "input_schema": {"type": "object", "properties": {}},
+            },
+            {
                 "name": "report_finding",
                 "description": "Record a CORROBORATED finding. Only call this after a "
                                "signal has been confirmed (e.g. timing re-run, reflection "
@@ -125,12 +137,24 @@ class Tools:
             if name == "probe_parameter":
                 base_req = _request_from(args)
                 baseline = self.engine.send(base_req)
-                signals = []
-                for m in mutate(base_req, classes=args.get("classes")):
+                signals, planted = [], []
+                for m in mutate(base_req, classes=args.get("classes"),
+                                payloads=self.payloads, oast=self.oast):
                     mutated = self.engine.send(m.request)
                     for s in analyze(baseline, mutated, m):
                         signals.append(asdict(s))
-                return json.dumps({"baseline": _summary(baseline), "signals": signals})
+                    if m.oast_token:
+                        planted.append({"token": m.oast_token, "point": m.point,
+                                        "payload_class": m.payload.payload_class})
+                return json.dumps({"baseline": _summary(baseline),
+                                   "signals": signals, "planted_oast": planted})
+
+            if name == "check_oast":
+                if self.oast is None:
+                    return json.dumps({"error": "OAST not configured"})
+                hits = [{"token": i.token, "protocol": i.protocol, "remote": i.remote_addr}
+                        for i in self.oast.poll()]
+                return json.dumps({"interactions": hits})
 
             if name == "report_finding":
                 f = Finding(

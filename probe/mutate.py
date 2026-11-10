@@ -25,6 +25,7 @@ class Mutation:
     payload: Payload
     point: str      # e.g. "query:id" or "json:user_id"
     marker: str     # the canary actually embedded in this request
+    oast_token: str | None = None   # set when an {oast} callback canary was planted
 
 
 def _new_marker() -> str:
@@ -65,12 +66,16 @@ def mutate(
     req: Request,
     classes: list[str] | None = None,
     payloads: list[Payload] | None = None,
+    oast=None,
 ) -> list[Mutation]:
     """Every (injection point x payload) as a ready-to-send Mutation.
 
     By default uses the built-in catalogue. Pass `payloads` (e.g. from
     load_payload_file) to use your own set instead; if `classes` is also given,
-    the set is filtered to those classes.
+    the set is filtered to those classes. Pass `oast` (an OASTProvider) to enable
+    payloads that contain '{oast}': each gets a fresh callback canary and the
+    resulting Mutation carries its token. A '{oast}' payload is skipped when no
+    provider is given, since a blind probe with nowhere to call back is useless.
     """
     points = discover_points(req)
     out: list[Mutation] = []
@@ -86,10 +91,18 @@ def mutate(
     for point in points:
         kind, _, key = point.partition(":")
         for payload in source:
+            oast_token = None
+            template = payload.template
+            if "{oast}" in template:
+                if oast is None:
+                    continue
+                canary = oast.new_canary()
+                template = template.replace("{oast}", canary.url)
+                oast_token = canary.token
             marker = _new_marker()
             # replace() not format(): payloads are written literally, so braces
             # in e.g. {{7*7}} need no escaping and {m} is the only token.
-            value = payload.template.replace("{m}", marker)
+            value = template.replace("{m}", marker)
             if kind == "query":
                 mutated = req.clone(
                     url=_apply_query(req.url, key, value),
@@ -102,5 +115,6 @@ def mutate(
                 )
             else:
                 continue
-            out.append(Mutation(request=mutated, payload=payload, point=point, marker=marker))
+            out.append(Mutation(request=mutated, payload=payload, point=point,
+                                marker=marker, oast_token=oast_token))
     return out

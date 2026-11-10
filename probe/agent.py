@@ -37,12 +37,16 @@ Method:
      real XSS signal; a value that came back HTML-encoded or JSON-escaped is
      probably safe — say so and don't over-report.
    - sql-error / server-error: confirm the baseline did not already contain it.
-4. ALWAYS ask: is this input actually attacker-reachable, and could a validator
+4. Blind bugs show nothing in the response. If a probe planted an out-of-band
+   canary (planted_oast in the result), call check_oast a little later: a
+   callback whose token matches confirms the target reached your listener, which
+   is strong out-of-band evidence even with an unchanged response.
+5. ALWAYS ask: is this input actually attacker-reachable, and could a validator
    or encoder upstream neutralise it before it reaches the sink? If it is likely
    gated, do not report it as a vulnerability (at most note it as info with that
    caveat). Injecting a payload is easy; confirming it reaches the sink is the
    whole job.
-5. report_finding only for corroborated issues. Set severity by real impact and
+6. report_finding only for corroborated issues. Set severity by real impact and
    justify reachability and reproduction. Prefer fewer, solid findings over many
    speculative ones.
 
@@ -52,10 +56,11 @@ tested and what you concluded.
 
 
 class Agent:
-    def __init__(self, engine: RequestEngine, llm: LLMClient, max_steps: int = 24):
+    def __init__(self, engine: RequestEngine, llm: LLMClient, max_steps: int = 24,
+                 oast=None, payloads=None):
         self.engine = engine
         self.llm = llm
-        self.tools = Tools(engine)
+        self.tools = Tools(engine, oast=oast, payloads=payloads)
         self.max_steps = max_steps
         self.transcript: list[dict] = []
 

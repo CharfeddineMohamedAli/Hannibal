@@ -80,6 +80,30 @@ muts = mutate(request, payloads=xss)
 Lines with `{m}` get the per-request canary marker; others are sent verbatim.
 See `examples/payloads.example.txt` for the format and source links.
 
+## Out-of-band (OAST) for blind bugs
+
+Blind bugs show nothing in the response; you confirm them when the target calls a
+listener you run. `probe` ships the **correlation half** only — a self-hostable
+listener and canary bookkeeping. The payloads that trigger a callback come from
+your own loaded lists, using an `{oast}` placeholder that gets a fresh canary.
+
+```python
+from probe import HttpCanaryListener, Agent, RequestEngine
+from probe.payloads import load_payload_file
+
+listener = HttpCanaryListener(public_base="http://YOUR.PUBLIC.HOST:8000").start()
+ssrf = load_payload_file("ssrf.txt", "ssrf")   # lines containing {oast}
+
+with RequestEngine(config) as engine:
+    agent = Agent(engine, AnthropicClient(), oast=listener, payloads=ssrf)
+    findings = agent.run(goal="Test /fetch?url= for SSRF.")
+listener.stop()
+```
+
+The agent plants a canary, then calls `check_oast`; a callback whose token
+matches confirms the blind bug out of band. For DNS callbacks, point the same
+interface at a self-hosted interactsh.
+
 ## Usage
 
 ```python

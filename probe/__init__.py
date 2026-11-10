@@ -6,6 +6,7 @@ from .config import ProgramConfig
 from .engine import RequestEngine
 from .models import Request, Response
 from .mutate import Mutation, discover_points, mutate
+from .oast import Canary, HttpCanaryListener, InMemoryOAST, Interaction, OASTProvider
 from .oracle import Signal, analyze
 from .payloads import Payload, load_payload_file, payloads_for
 from .agent import Agent
@@ -36,4 +37,9 @@ __all__ = [
     "ToolCall",
     "AnthropicClient",
     "FakeLLMClient",
+    "OASTProvider",
+    "InMemoryOAST",
+    "HttpCanaryListener",
+    "Canary",
+    "Interaction",
 ]
