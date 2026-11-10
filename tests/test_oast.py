@@ -20,7 +20,7 @@ class CallbackEngine:
         self.oast = oast
         self.sent = []
 
-    def send(self, req):
+    def send(self, req, identity=None):
         self.sent.append(req)
         token = self.oast.scan(req.url)
         if token:

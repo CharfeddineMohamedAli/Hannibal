@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import time
 
+from .auth import merge_headers, resolve_identity
 from .config import ProgramConfig
 from .models import Request, Response
 from .ratelimit import RateLimiter
@@ -42,15 +43,17 @@ class RequestEngine:
             follow_redirects=False, timeout=config.timeout_seconds
         )
 
-    def send(self, req: Request) -> Response:
+    def send(self, req: Request, identity: str | None = None) -> Response:
         # 1. Scope gate — before the request can leave the process.
         self.scope.check(req.url)
 
-        # 2. Inject required headers. Program headers win over caller headers so
-        #    a mutation can never accidentally strip the identifier the program
-        #    requires on every request.
-        headers = dict(req.headers)
-        headers.update(self.config.required_headers)
+        # 2. Build headers: request base < identity (auth) < required (compliance).
+        #    The chosen identity supplies auth; required headers can never be
+        #    dropped. Unknown identity raises (surfaced to the caller as an error).
+        ident_headers = resolve_identity(
+            self.config.identities, identity, self.config.default_identity
+        )
+        headers = merge_headers(req.headers, ident_headers, self.config.required_headers)
 
         # 3. Rate limit.
         self.limiter.acquire()

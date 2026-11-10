@@ -117,6 +117,34 @@ print(agent.report(program="Example BB", target="api.example-staging.test",
 
 Or render any `list[Finding]` directly with `render_markdown(...)`.
 
+## Authenticated & multi-account (IDOR) testing
+
+Single login — put the token in `required_headers`; it's stamped on every request:
+
+```python
+required_headers={"X-Bug-Bounty": "HackerOne-you", "Authorization": "Bearer <token>"}
+```
+
+Cross-account (IDOR/BOLA) — define named identities instead, and the agent replays
+a request as a different user to check object-level authorization:
+
+```python
+ProgramConfig(
+    name="...", allowed_hosts=[...],
+    required_headers={"X-Bug-Bounty": "HackerOne-you"},   # keep auth OUT of here
+    identities={
+        "A": {"Authorization": "Bearer <token-A>"},
+        "B": {"Authorization": "Bearer <token-B>"},
+    },
+    default_identity="A",
+)
+```
+
+Header precedence is request < identity (auth) < required (compliance), so the
+identity supplies auth while the required headers can never be dropped. The agent
+fetches an object as A, replays the exact request as B, and reports if B gets A's
+data instead of being denied.
+
 ## Usage
 
 ```python

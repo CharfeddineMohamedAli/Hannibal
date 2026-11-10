@@ -42,12 +42,19 @@ Method:
    canary (planted_oast in the result), call check_oast a little later: a
    callback whose token matches confirms the target reached your listener, which
    is strong out-of-band evidence even with an unchanged response.
-5. ALWAYS ask: is this input actually attacker-reachable, and could a validator
+5. Cross-account access (IDOR / BOLA): when two or more identities are available,
+   test object-level authorization by replaying one identity's request as another.
+   Fetch an object as its owner (identity A), then send the EXACT same request as
+   identity B via the 'identity' argument. If B gets A's object (success, same
+   data) instead of 403/404, that is broken object-level authorization — a
+   finding. Only report it when the object genuinely belongs to the other account;
+   a shared or public resource returning for both is not a bug.
+6. ALWAYS ask: is this input actually attacker-reachable, and could a validator
    or encoder upstream neutralise it before it reaches the sink? If it is likely
    gated, do not report it as a vulnerability (at most note it as info with that
    caveat). Injecting a payload is easy; confirming it reaches the sink is the
    whole job.
-6. report_finding only for corroborated issues. Set severity by real impact and
+7. report_finding only for corroborated issues. Set severity by real impact and
    justify reachability and reproduction. Prefer fewer, solid findings over many
    speculative ones.
 
@@ -67,6 +74,12 @@ class Agent:
 
     def run(self, goal: str, seed_requests: list[dict] | None = None) -> list[Finding]:
         intro = goal
+        config = getattr(self.engine, "config", None)
+        identities = list(config.identities) if config else []
+        if identities:
+            intro += ("\n\nAvailable identities (pass as 'identity'): "
+                      + ", ".join(identities)
+                      + ". Use them to test cross-account access.")
         if seed_requests:
             intro += "\n\nSeed requests:\n" + json.dumps(seed_requests, indent=2)
         history: list[dict] = [{"role": "user", "text": intro}]

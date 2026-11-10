@@ -15,8 +15,15 @@ from dataclasses import dataclass, field
 class ProgramConfig:
     name: str
     allowed_hosts: list[str]
-    # Identifier/auth headers the program requires on every request.
+    # Compliance/identifier headers stamped on every request (e.g. a bug-bounty
+    # identifier). These always win — keep per-user auth out of here when using
+    # identities, or it would override them.
     required_headers: dict[str, str] = field(default_factory=dict)
+    # Named identities for cross-account (IDOR/BOLA) testing: name -> auth headers.
+    # e.g. {"A": {"Authorization": "Bearer tokA"}, "B": {"Authorization": "Bearer tokB"}}
+    identities: dict[str, dict] = field(default_factory=dict)
+    # Identity used when a request names none.
+    default_identity: str | None = None
     # Sustained ceiling. Keep at or under whatever the program states.
     max_requests_per_sec: float = 5.0
     # Bucket capacity: how many requests may go back-to-back before the

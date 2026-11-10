@@ -15,7 +15,7 @@ class FakeEngine:
     def __init__(self):
         self.sent = []
 
-    def send(self, req):
+    def send(self, req, identity=None):
         self.sent.append(req)
         return Response(status=200, headers={}, body=req.url.encode(),
                         elapsed_ms=50.0, request=req)

@@ -69,6 +69,9 @@ class Tools:
             "url": {"type": "string", "description": "full in-scope URL"},
             "headers": {"type": "object", "description": "extra request headers"},
             "body": {"type": "string", "description": "raw request body"},
+            "identity": {"type": "string", "description": "name of the identity to send "
+                                                          "as (for cross-account/IDOR tests); "
+                                                          "omit for the default"},
         }
         return [
             {
@@ -132,15 +135,17 @@ class Tools:
     def dispatch(self, name: str, args: dict) -> str:
         try:
             if name == "send_request":
-                return json.dumps(_summary(self.engine.send(_request_from(args))))
+                ident = args.get("identity")
+                return json.dumps(_summary(self.engine.send(_request_from(args), identity=ident)))
 
             if name == "probe_parameter":
+                ident = args.get("identity")
                 base_req = _request_from(args)
-                baseline = self.engine.send(base_req)
+                baseline = self.engine.send(base_req, identity=ident)
                 signals, planted = [], []
                 for m in mutate(base_req, classes=args.get("classes"),
                                 payloads=self.payloads, oast=self.oast):
-                    mutated = self.engine.send(m.request)
+                    mutated = self.engine.send(m.request, identity=ident)
                     for s in analyze(baseline, mutated, m):
                         signals.append(asdict(s))
                     if m.oast_token:
