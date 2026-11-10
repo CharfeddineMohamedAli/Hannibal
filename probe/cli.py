@@ -37,14 +37,19 @@ def _run(args) -> int:
 
     # Imported here so the no-key path and --help need neither httpx nor the SDK.
     from .agent import Agent
+    from .approve import AutoApprover, ConsoleApprover
     from .engine import RequestEngine
     from .llm import AnthropicClient
     from .report import render_markdown
 
+    # Human-in-the-loop by default: every batch of sends is shown and must be
+    # approved. --yes auto-approves (use only against a lab/scope you own).
+    approver = AutoApprover(allow=True) if args.yes else ConsoleApprover()
+
     seeds = [{"method": "GET", "url": u} for u in args.seed]
     with RequestEngine(config) as engine:
         agent = Agent(engine, AnthropicClient(model=args.model),
-                      max_steps=args.max_steps, verbose=args.verbose)
+                      max_steps=args.max_steps, verbose=args.verbose, approver=approver)
         findings = agent.run(goal=args.goal, seed_requests=seeds or None)
 
     print(f"\n{len(findings)} finding(s).\n", file=sys.stderr)
@@ -72,6 +77,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--max-steps", type=int, default=24)
     run.add_argument("--verbose", action="store_true",
                      help="print each step: model text, tool calls, and results")
+    run.add_argument("--yes", action="store_true",
+                     help="auto-approve all sends (no prompts) — only for a lab/scope you own")
     run.add_argument("--report", help="write the Markdown report to this path")
     return p
 

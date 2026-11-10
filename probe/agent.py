@@ -67,10 +67,10 @@ genuinely done, then give a short summary of what you tested and concluded.
 
 class Agent:
     def __init__(self, engine: RequestEngine, llm: LLMClient, max_steps: int = 24,
-                 oast=None, payloads=None, verbose: bool = False):
+                 oast=None, payloads=None, verbose: bool = False, approver=None):
         self.engine = engine
         self.llm = llm
-        self.tools = Tools(engine, oast=oast, payloads=payloads)
+        self.tools = Tools(engine, oast=oast, payloads=payloads, approver=approver)
         self.max_steps = max_steps
         self.verbose = verbose
         self.transcript: list[dict] = []

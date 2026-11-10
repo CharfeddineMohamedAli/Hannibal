@@ -56,11 +56,18 @@ def _request_from(args: dict) -> Request:
 
 
 class Tools:
-    def __init__(self, engine: RequestEngine, oast=None, payloads=None):
+    def __init__(self, engine: RequestEngine, oast=None, payloads=None, approver=None):
         self.engine = engine
         self.oast = oast            # optional OASTProvider for blind detection
         self.payloads = payloads    # optional loaded payload set (else built-ins)
+        self.approver = approver    # optional human-in-the-loop gate
         self.findings: list[Finding] = []
+
+    def _approve(self, label: str, requests: list) -> list:
+        """Filter a batch of requests through the approver (all pass if none)."""
+        if self.approver is None:
+            return requests
+        return self.approver.confirm(label, requests)
 
     # ---- schemas advertised to the model -------------------------------
     def schemas(self) -> list[dict]:
@@ -136,22 +143,36 @@ class Tools:
         try:
             if name == "send_request":
                 ident = args.get("identity")
-                return json.dumps(_summary(self.engine.send(_request_from(args), identity=ident)))
+                req = _request_from(args)
+                if not self._approve(f"send_request ({ident or 'default'})", [req]):
+                    return json.dumps({"skipped": "not approved by human"})
+                return json.dumps(_summary(self.engine.send(req, identity=ident)))
 
             if name == "probe_parameter":
                 ident = args.get("identity")
                 base_req = _request_from(args)
+                muts = mutate(base_req, classes=args.get("classes"),
+                              payloads=self.payloads, oast=self.oast)
+                # Human approves the whole batch (baseline + mutations) before any send.
+                queued = [base_req] + [m.request for m in muts]
+                approved = self._approve(f"probe {base_req.url}", queued)
+                approved_set = {id(r) for r in approved}
+                if id(base_req) not in approved_set:
+                    return json.dumps({"skipped": "baseline not approved; nothing sent"})
+
                 baseline = self.engine.send(base_req, identity=ident)
-                signals, planted = [], []
-                for m in mutate(base_req, classes=args.get("classes"),
-                                payloads=self.payloads, oast=self.oast):
+                signals, planted, sent = [], [], 0
+                for m in muts:
+                    if id(m.request) not in approved_set:
+                        continue
+                    sent += 1
                     mutated = self.engine.send(m.request, identity=ident)
                     for s in analyze(baseline, mutated, m):
                         signals.append(asdict(s))
                     if m.oast_token:
                         planted.append({"token": m.oast_token, "point": m.point,
                                         "payload_class": m.payload.payload_class})
-                return json.dumps({"baseline": _summary(baseline),
+                return json.dumps({"baseline": _summary(baseline), "mutations_sent": sent,
                                    "signals": signals, "planted_oast": planted})
 
             if name == "check_oast":

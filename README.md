@@ -120,6 +120,24 @@ The agent plants a canary, then calls `check_oast`; a callback whose token
 matches confirms the blind bug out of band. For DNS callbacks, point the same
 interface at a self-hosted interactsh.
 
+## Human-in-the-loop (default)
+
+The model reasons; a human pulls the trigger. Before any batch of requests is
+sent, the tool prints exactly what's queued and waits for your decision —
+approve all, none, or the first N. Nothing reaches the network unattended.
+
+```
+[approval] probe http://localhost:3000/rest/products/search?q=apple — 9 request(s) queued:
+    1. GET http://localhost:3000/rest/products/search?q=apple
+    2. GET http://localhost:3000/rest/products/search?q=zq8f...'
+    ...
+[approval] send which? [a]ll / [n]one / a number N (first N):
+```
+
+Pass `--yes` to auto-approve without prompts — only for a lab or scope you own.
+The model stays in the reasoning seat (read responses, judge signals, explain
+bugs, write the report); you decide what actually gets sent.
+
 ## Reporting
 
 Turn a run's findings into a deduplicated Markdown report (severity-ordered, with

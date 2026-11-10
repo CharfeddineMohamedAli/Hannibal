@@ -11,6 +11,7 @@ from .oracle import Signal, analyze
 from .report import dedup, render_markdown
 from .payloads import Payload, load_payload_file, payloads_for
 from .agent import Agent
+from .approve import Approver, AutoApprover, ConsoleApprover
 from .auth import merge_headers, resolve_identity
 from .llm import AnthropicClient, FakeLLMClient, LLMClient, LLMResponse, ToolCall
 from .scope import ScopeError, ScopeGuard
@@ -48,4 +49,7 @@ __all__ = [
     "dedup",
     "resolve_identity",
     "merge_headers",
+    "Approver",
+    "AutoApprover",
+    "ConsoleApprover",
 ]
