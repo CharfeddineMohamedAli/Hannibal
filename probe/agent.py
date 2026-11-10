@@ -17,6 +17,7 @@ import json
 
 from .engine import RequestEngine
 from .llm import LLMClient
+from .report import render_markdown
 from .tools import Finding, Tools
 
 SYSTEM = """\
@@ -86,3 +87,8 @@ class Agent:
 
         self.transcript = history
         return self.tools.findings
+
+    def report(self, program: str | None = None, target: str | None = None,
+               when: str | None = None) -> str:
+        """Render this run's findings as a Markdown report."""
+        return render_markdown(self.tools.findings, program=program, target=target, when=when)

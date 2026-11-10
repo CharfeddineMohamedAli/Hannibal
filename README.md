@@ -104,6 +104,19 @@ The agent plants a canary, then calls `check_oast`; a callback whose token
 matches confirms the blind bug out of band. For DNS callbacks, point the same
 interface at a self-hosted interactsh.
 
+## Reporting
+
+Turn a run's findings into a deduplicated Markdown report (severity-ordered, with
+a reachability section for each):
+
+```python
+findings = agent.run(goal="…")
+print(agent.report(program="Example BB", target="api.example-staging.test",
+                   when="2026-11-10"))
+```
+
+Or render any `list[Finding]` directly with `render_markdown(...)`.
+
 ## Usage
 
 ```python

@@ -8,6 +8,7 @@ from .models import Request, Response
 from .mutate import Mutation, discover_points, mutate
 from .oast import Canary, HttpCanaryListener, InMemoryOAST, Interaction, OASTProvider
 from .oracle import Signal, analyze
+from .report import dedup, render_markdown
 from .payloads import Payload, load_payload_file, payloads_for
 from .agent import Agent
 from .llm import AnthropicClient, FakeLLMClient, LLMClient, LLMResponse, ToolCall
@@ -42,4 +43,6 @@ __all__ = [
     "HttpCanaryListener",
     "Canary",
     "Interaction",
+    "render_markdown",
+    "dedup",
 ]
