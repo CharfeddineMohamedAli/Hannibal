@@ -43,7 +43,8 @@ def _run(args) -> int:
 
     seeds = [{"method": "GET", "url": u} for u in args.seed]
     with RequestEngine(config) as engine:
-        agent = Agent(engine, AnthropicClient(model=args.model), max_steps=args.max_steps)
+        agent = Agent(engine, AnthropicClient(model=args.model),
+                      max_steps=args.max_steps, verbose=args.verbose)
         findings = agent.run(goal=args.goal, seed_requests=seeds or None)
 
     print(f"\n{len(findings)} finding(s).\n", file=sys.stderr)
@@ -69,6 +70,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--model", default="claude-sonnet-5-5",
                      help="model id (see console.anthropic.com for what your key can use)")
     run.add_argument("--max-steps", type=int, default=24)
+    run.add_argument("--verbose", action="store_true",
+                     help="print each step: model text, tool calls, and results")
     run.add_argument("--report", help="write the Markdown report to this path")
     return p
 

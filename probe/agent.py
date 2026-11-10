@@ -14,6 +14,7 @@ the tool from crying wolf.
 from __future__ import annotations
 
 import json
+import sys
 
 from .engine import RequestEngine
 from .llm import LLMClient
@@ -65,12 +66,17 @@ tested and what you concluded.
 
 class Agent:
     def __init__(self, engine: RequestEngine, llm: LLMClient, max_steps: int = 24,
-                 oast=None, payloads=None):
+                 oast=None, payloads=None, verbose: bool = False):
         self.engine = engine
         self.llm = llm
         self.tools = Tools(engine, oast=oast, payloads=payloads)
         self.max_steps = max_steps
+        self.verbose = verbose
         self.transcript: list[dict] = []
+
+    def _log(self, msg: str) -> None:
+        if self.verbose:
+            print(msg, file=sys.stderr, flush=True)
 
     def run(self, goal: str, seed_requests: list[dict] | None = None) -> list[Finding]:
         intro = goal
@@ -85,19 +91,25 @@ class Agent:
         history: list[dict] = [{"role": "user", "text": intro}]
         schemas = self.tools.schemas()
 
-        for _ in range(self.max_steps):
+        for step in range(self.max_steps):
             resp = self.llm.call(SYSTEM, history, schemas)
+            if resp.text:
+                self._log(f"[step {step+1}] model: {resp.text[:300]}")
             history.append({
                 "role": "assistant",
                 "text": resp.text,
                 "calls": [{"id": c.id, "name": c.name, "args": c.args} for c in resp.tool_calls],
             })
             if resp.done:
+                self._log(f"[step {step+1}] model made no tool call — stopping.")
                 break
             for call in resp.tool_calls:
+                self._log(f"[step {step+1}] -> {call.name}({json.dumps(call.args)[:200]})")
                 result = self.tools.dispatch(call.name, call.args)
+                self._log(f"[step {step+1}] <- {result[:400]}")
                 history.append({"role": "tool", "id": call.id, "content": result})
 
+        self._log(f"[done] {len(self.tools.findings)} finding(s) after {step+1} step(s).")
         self.transcript = history
         return self.tools.findings
 
