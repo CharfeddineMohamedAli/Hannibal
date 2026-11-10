@@ -87,6 +87,30 @@ def test_oracle_stays_silent_on_transport_error():
     assert analyze(_resp("ok"), err, m) == []
 
 
+def test_reflection_encoded_scores_low():
+    # Same payload, but the breakout chars come back HTML-encoded -> gated.
+    req = Request("GET", "https://t.test/a?q=1")
+    m = next(x for x in mutate(req, classes=["reflection"]) if x.payload.template == "{m}'\"<>")
+    mutated = _resp(f"<div>{m.marker}&#39;&quot;&lt;&gt;</div>")
+    refl = _one(analyze(_resp("<div></div>"), mutated, m), "reflection")
+    assert refl and refl[0].confidence <= 0.2   # reflected, but safely encoded
+
+
+def test_header_reflection_signal():
+    req = Request("GET", "https://t.test/r?next=1")
+    m = next(x for x in mutate(req, classes=["reflection"]) if x.payload.template == "{m}")
+    mutated = Response(302, {"Location": f"/go?to={m.marker}"}, b"", 20.0, m.request)
+    assert _one(analyze(_resp("ok"), mutated, m), "header-reflection")
+
+
+def test_length_differential_signal():
+    req = Request("GET", "https://t.test/a?id=1")
+    m = next(x for x in mutate(req, classes=["sqli-error"]) if x.payload.template == "{m}' OR '1'='1")
+    base = _resp("x" * 300)
+    big = _resp("x" * 1200)   # >200 bytes and >30% larger
+    assert _one(analyze(base, big, m), "diff-length")
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for fn in fns:

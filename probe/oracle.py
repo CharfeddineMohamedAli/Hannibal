@@ -46,14 +46,37 @@ class Signal:
     payload_class: str
 
 
-def _context_around(text: str, marker: str) -> str:
-    """A tiny window around the marker, so the brain can judge the HTML/JS/JSON
-    context a reflection landed in (unencoded <script> vs encoded JSON string)."""
+_ENCODED = ("&lt;", "&gt;", "&quot;", "&#39;", "&#x27;", "&amp;", "%3c", "%3e", "\\u003c")
+
+
+def _reflection_detail(text: str, marker: str, trailing: str):
+    """Return (context, raw_intact, encoded) for a reflected marker.
+
+    raw_intact: our breakout characters came back unchanged right after the
+    marker (reachable). encoded: they came back escaped (gated — likely safe).
+    context: the sink the reflection landed in, which decides how dangerous raw
+    reflection is."""
     i = text.find(marker)
     if i == -1:
-        return ""
-    lo, hi = max(0, i - 40), min(len(text), i + len(marker) + 40)
-    return text[lo:hi].replace("\n", " ")
+        return None
+    before = text[max(0, i - 80):i].lower()
+    after = text[i + len(marker): i + len(marker) + 24]
+
+    # Context from what precedes the reflection.
+    last_open = before.rfind("<script")
+    if last_open != -1 and before.find("</script", last_open) == -1:
+        context = "script"
+    else:
+        tag = before[before.rfind("<"):]
+        context = "attribute" if ("=\"" in tag or "='" in tag) else "html"
+
+    raw_intact = bool(trailing) and (marker + trailing) in text
+    encoded = (not raw_intact) and any(e in after.lower() for e in _ENCODED)
+    return context, raw_intact, encoded
+
+
+def _lower_headers(resp: Response) -> dict:
+    return {k.lower(): v for k, v in (resp.headers or {}).items()}
 
 
 def analyze(baseline: Response, mutated: Response, mutation: Mutation) -> list[Signal]:
@@ -67,19 +90,31 @@ def analyze(baseline: Response, mutated: Response, mutation: Mutation) -> list[S
     base_text = baseline.text if baseline and baseline.ok else ""
     mut_text = mutated.text
 
-    # --- Reflection -------------------------------------------------------
+    # --- Reflection (encoding-aware) -------------------------------------
     if marker in mut_text:
-        ctx = _context_around(mut_text, marker)
-        # Did breakout characters survive alongside the marker?
-        raw_special = any(c in ctx for c in "<>\"'") and pclass == "reflection"
-        in_script = "<script" in ctx.lower() or "</script" in ctx.lower()
-        conf = 0.6 if raw_special else 0.25
-        if in_script:
-            conf = max(conf, 0.7)
-        signals.append(Signal(
-            "reflection", conf,
-            f"marker reflected; context: …{ctx}…", point, pclass,
-        ))
+        trailing = mutation.payload.template.split("{m}", 1)[1] if "{m}" in mutation.payload.template else ""
+        detail = _reflection_detail(mut_text, marker, trailing)
+        context, raw_intact, encoded = detail if detail else ("html", False, False)
+        if raw_intact:
+            conf = {"script": 0.85, "attribute": 0.7, "html": 0.6}[context]
+            ev = f"breakout chars survived UNENCODED in {context} context ({trailing!r})"
+        elif encoded:
+            conf = 0.15  # gated: our characters came back escaped
+            ev = "reflected but breakout chars came back ENCODED — likely gated/safe"
+        else:
+            conf = 0.2
+            ev = "input reflected (no raw breakout chars confirmed here)"
+        signals.append(Signal("reflection", conf, ev, point, pclass))
+
+    # --- Reflected into a response header (open redirect / header inject) --
+    mut_headers = _lower_headers(mutated)
+    for h in ("location", "set-cookie"):
+        if marker in mut_headers.get(h, ""):
+            signals.append(Signal(
+                "header-reflection", 0.5,
+                f"input reflected into the {h} header — possible open redirect / "
+                f"header injection", point, pclass,
+            ))
 
     # --- SQL error signature ---------------------------------------------
     if pclass in ("sqli-error", "reflection"):
@@ -131,5 +166,15 @@ def analyze(baseline: Response, mutated: Response, mutation: Mutation) -> list[S
             "diff-status", 0.2,
             f"status {baseline.status} -> {mutated.status}", point, pclass,
         ))
+
+    # --- Length differential (boolean-based blind cue) -------------------
+    if baseline and baseline.ok and base_text:
+        delta = abs(len(mut_text) - len(base_text))
+        if delta > 200 and delta > 0.3 * len(base_text):
+            signals.append(Signal(
+                "diff-length", 0.25,
+                f"body size {len(base_text)} -> {len(mut_text)} ({delta} bytes) — "
+                f"compare true/false payloads to confirm", point, pclass,
+            ))
 
     return signals
