@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import time
 
-import httpx
-
 from .config import ProgramConfig
 from .models import Request, Response
 from .ratelimit import RateLimiter
@@ -33,6 +31,11 @@ class RequestEngine:
             config.jitter_seconds,
             burst=config.burst,
         )
+        # httpx is imported lazily so the rest of the package (models, scope,
+        # mutation, oracle) is usable without it installed — only sending needs it.
+        import httpx
+
+        self._httpx = httpx
         # follow_redirects is always False at the client level; we decide per
         # response whether a redirect is in scope before doing anything with it.
         self._client = httpx.Client(
@@ -58,7 +61,7 @@ class RequestEngine:
             raw = self._client.request(
                 req.method, req.url, headers=headers, content=req.body
             )
-        except httpx.HTTPError as exc:
+        except self._httpx.HTTPError as exc:
             return Response(
                 status=0,
                 headers={},
