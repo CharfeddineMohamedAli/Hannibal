@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field
 from .engine import RequestEngine
 from .models import Request, Response
 from .mutate import mutate
-from .oracle import analyze
+from .oracle import analyze, stateless_signals
 from .scope import ScopeError
 
 
@@ -146,7 +146,12 @@ class Tools:
                 req = _request_from(args)
                 if not self._approve(f"send_request ({ident or 'default'})", [req]):
                     return json.dumps({"skipped": "not approved by human"})
-                return json.dumps(_summary(self.engine.send(req, identity=ident)))
+                resp = self.engine.send(req, identity=ident)
+                out = _summary(resp)
+                # Run baseline-free detectors so a one-off send still surfaces a
+                # SQL error / stack trace / passwd read as a structured signal.
+                out["signals"] = [asdict(s) for s in stateless_signals(resp)]
+                return json.dumps(out)
 
             if name == "probe_parameter":
                 ident = args.get("identity")

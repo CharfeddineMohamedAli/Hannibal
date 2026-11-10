@@ -81,6 +81,33 @@ def _lower_headers(resp: Response) -> dict:
     return {k.lower(): v for k, v in (resp.headers or {}).items()}
 
 
+def stateless_signals(resp: Response, point: str = "response") -> list[Signal]:
+    """Detectors that need no baseline — run on ANY single response (e.g. a
+    one-off send_request). Catches the giveaways that stand on their own: a SQL
+    error signature, a server stack trace, an /etc/passwd read. Lets the oracle
+    flag a bug even when the request wasn't part of a probe batch."""
+    out: list[Signal] = []
+    if not resp or not resp.ok:
+        return out
+    text = resp.text
+    m = _SQL_ERRORS.search(text)
+    if m:
+        out.append(Signal("sql-error", 0.75,
+                          f"db error signature in response: {m.group(0)!r}", point, "-"))
+    sm = _STACK.search(text)
+    if sm:
+        out.append(Signal("server-error", 0.4,
+                          f"server-side error/stack trace: {sm.group(0)!r}", point, "-"))
+    if _PASSWD.search(text):
+        out.append(Signal("file-read", 0.85,
+                          "/etc/passwd signature (root:...:0:0:) in response", point, "-"))
+    if resp.status >= 500:
+        out.append(Signal("server-500", 0.3,
+                          f"HTTP {resp.status} — server error, often an injection symptom",
+                          point, "-"))
+    return out
+
+
 def analyze(baseline: Response, mutated: Response, mutation: Mutation) -> list[Signal]:
     signals: list[Signal] = []
     point, pclass = mutation.point, mutation.payload.payload_class

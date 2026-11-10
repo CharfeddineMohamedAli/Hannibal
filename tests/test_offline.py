@@ -80,6 +80,18 @@ def test_timing_signal_needs_real_jump():
     assert not _one(analyze(base, fast, m), "timing")
 
 
+def test_stateless_signals_flag_juiceshop_sqli():
+    from probe.oracle import stateless_signals
+    body = '<title>SQLITE_ERROR: near "\'%\'": syntax error</title>'
+    r = Response(500, {}, body.encode(), 30.0, Request("GET", "https://t/x"))
+    kinds = {s.kind for s in stateless_signals(r)}
+    assert "sql-error" in kinds        # the real Juice Shop giveaway
+    assert "server-500" in kinds
+    # clean 200 response raises nothing
+    ok = Response(200, {}, b"all good", 20.0, Request("GET", "https://t/x"))
+    assert stateless_signals(ok) == []
+
+
 def test_oracle_stays_silent_on_transport_error():
     req = Request("GET", "https://t.test/a?id=1")
     m = mutate(req, classes=["sqli-error"])[0]
