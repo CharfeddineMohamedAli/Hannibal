@@ -8,7 +8,10 @@ from .models import Request, Response
 from .mutate import Mutation, discover_points, mutate
 from .oracle import Signal, analyze
 from .payloads import Payload, payloads_for
+from .agent import Agent
+from .llm import AnthropicClient, FakeLLMClient, LLMClient, LLMResponse, ToolCall
 from .scope import ScopeError, ScopeGuard
+from .tools import Finding, Tools
 
 __all__ = [
     "ProgramConfig",
@@ -24,4 +27,12 @@ __all__ = [
     "Signal",
     "Payload",
     "payloads_for",
+    "Agent",
+    "Tools",
+    "Finding",
+    "LLMClient",
+    "LLMResponse",
+    "ToolCall",
+    "AnthropicClient",
+    "FakeLLMClient",
 ]
