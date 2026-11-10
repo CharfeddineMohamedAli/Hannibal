@@ -38,7 +38,23 @@ chooses strategy while the muscle does the firing under hard rules.
 Next: OAST (out-of-band) for blind bugs → a target-state model → multi-account
 IDOR / business-logic reasoning.
 
-## Running the agent
+## Running from the CLI
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+python -m probe run \
+  --config examples/juice-shop.config.json \
+  --goal "Test product search for injection and reflection." \
+  --seed "http://localhost:3000/rest/products/search?q=apple" \
+  --report findings.md
+```
+
+The config is a small JSON file (hosts, headers, identities, rate). See
+[`docs/validation.md`](docs/validation.md) for a full first run against a local
+OWASP Juice Shop — the right way to check it finds real bugs and avoids false
+positives before pointing it anywhere else.
+
+## Running from Python
 
 ```python
 from probe import ProgramConfig, RequestEngine, Agent, AnthropicClient

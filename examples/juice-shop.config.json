@@ -1,0 +1,8 @@
+{
+  "name": "Local Juice Shop (lab)",
+  "allowed_hosts": ["localhost"],
+  "required_headers": {},
+  "max_requests_per_sec": 8,
+  "burst": 1,
+  "follow_redirects": false
+}
