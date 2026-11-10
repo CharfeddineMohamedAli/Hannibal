@@ -92,11 +92,9 @@ class Agent:
         history: list[dict] = [{"role": "user", "text": intro}]
         schemas = self.tools.schemas()
 
+        nudges = 0
         for step in range(self.max_steps):
-            # Force a tool call on the first step so the agent actually starts
-            # probing instead of replying with a plan and stopping.
-            tool_choice = {"type": "any"} if step == 0 else None
-            resp = self.llm.call(SYSTEM, history, schemas, tool_choice=tool_choice)
+            resp = self.llm.call(SYSTEM, history, schemas)
             self._log(f"[step {step+1}] stop={resp.stop_reason} "
                       f"blocks={resp.block_types} calls={len(resp.tool_calls)}")
             if resp.text:
@@ -107,6 +105,16 @@ class Agent:
                 "calls": [{"id": c.id, "name": c.name, "args": c.args} for c in resp.tool_calls],
             })
             if resp.done:
+                # No tool call. If we haven't done anything yet, the model is
+                # narrating instead of acting — nudge it to use the tools rather
+                # than ending the run silently.
+                if not self.tools.findings and nudges < 2:
+                    nudges += 1
+                    self._log(f"[step {step+1}] no tool call — nudging ({nudges}/2).")
+                    history.append({"role": "user", "text":
+                        "Do not just describe a plan. Call probe_parameter now on "
+                        "the seed request to actually send the probes."})
+                    continue
                 self._log(f"[step {step+1}] model made no tool call — stopping.")
                 break
             for call in resp.tool_calls:
