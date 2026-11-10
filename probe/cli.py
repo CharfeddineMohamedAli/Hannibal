@@ -66,7 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--goal", required=True, help="plain-English goal")
     run.add_argument("--seed", action="append", default=[],
                      help="seed request URL (repeatable)")
-    run.add_argument("--model", default="claude-sonnet-4-5")
+    run.add_argument("--model", default="claude-sonnet-5-5",
+                     help="model id (see console.anthropic.com for what your key can use)")
     run.add_argument("--max-steps", type=int, default=24)
     run.add_argument("--report", help="write the Markdown report to this path")
     return p

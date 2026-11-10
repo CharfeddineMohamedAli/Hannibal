@@ -46,7 +46,7 @@ class AnthropicClient(LLMClient):
     the documented tool-use shape.
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-5", max_tokens: int = 2048, api_key: str | None = None):
+    def __init__(self, model: str = "claude-sonnet-5-5", max_tokens: int = 2048, api_key: str | None = None):
         import anthropic
 
         self._client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
